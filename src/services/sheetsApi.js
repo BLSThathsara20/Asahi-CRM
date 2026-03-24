@@ -1,4 +1,5 @@
 import { SHEET_ID, SHEET_NAME, COLS } from "../constants.js";
+import { messageFromSheetsResponse } from "../utils/sheetsErrors.js";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -19,7 +20,10 @@ export async function fetchLeadsRaw(accessToken) {
 	}
 	if (!res.ok) {
 		const t = await res.text();
-		throw new Error(t || `Sheets error ${res.status}`);
+		throw new Error(
+			messageFromSheetsResponse(res.status, t) ||
+				`Sheets error ${res.status}`,
+		);
 	}
 	const data = await res.json();
 	return data.values || [];
@@ -87,7 +91,10 @@ export async function updateLeadRow(accessToken, sheetRow, lead) {
 	}
 	if (!res.ok) {
 		const t = await res.text();
-		throw new Error(t || `Update failed ${res.status}`);
+		throw new Error(
+			messageFromSheetsResponse(res.status, t) ||
+				`Update failed ${res.status}`,
+		);
 	}
 }
 
@@ -109,6 +116,9 @@ export async function appendLeadRow(accessToken, lead) {
 	}
 	if (!res.ok) {
 		const t = await res.text();
-		throw new Error(t || `Append failed ${res.status}`);
+		throw new Error(
+			messageFromSheetsResponse(res.status, t) ||
+				`Append failed ${res.status}`,
+		);
 	}
 }

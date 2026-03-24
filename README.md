@@ -17,9 +17,9 @@ Spreadsheet: sheet named **All leads**, columns **Date, Name, Phone, Email, Car,
 
 2. In Firebase **Authentication → Sign-in method**, enable **Google**.
 
-3. In [Google Cloud Console](https://console.cloud.google.com/) for that project:
+3. In [Google Cloud Console](https://console.cloud.google.com/) select the **same project** as Firebase (e.g. `asahi-crm`), then:
 
-   - Enable **Google Sheets API**.
+   - Enable **Google Sheets API** (direct link for that API: [Enable Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com) — pick your project in the header if asked).
    - **APIs & Services → OAuth consent screen**: add the scope  
      `https://www.googleapis.com/auth/spreadsheets`  
      (or use “manually add scopes” if needed).

@@ -3,6 +3,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fetchLeadsRaw, parseLeads } from "../services/sheetsApi.js";
+import { formatSheetsThrownError } from "../utils/sheetsErrors.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 
 export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
@@ -32,7 +33,7 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 			}
 			setLeads(parseLeads(rows));
 		} catch (e) {
-			setError(e?.message || "Could not load leads");
+			setError(formatSheetsThrownError(e));
 			setLeads([]);
 		} finally {
 			setLoading(false);
@@ -118,7 +119,10 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 			</div>
 
 			{error && (
-				<p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200/80">
+				<p
+					role="alert"
+					className="rounded-xl bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-800 ring-1 ring-rose-200/80"
+				>
 					{error}
 				</p>
 			)}

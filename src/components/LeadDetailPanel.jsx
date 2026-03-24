@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { STATUSES } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { updateLeadRow } from "../services/sheetsApi.js";
+import { formatSheetsThrownError } from "../utils/sheetsErrors.js";
 import { phoneToWaDigits } from "../utils/phone.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 
@@ -55,7 +56,7 @@ export function LeadDetailPanel({ lead, open, onClose, onSaved }) {
 			onSaved?.();
 			onClose();
 		} catch (e) {
-			setError(e?.message || "Could not save");
+			setError(formatSheetsThrownError(e));
 		} finally {
 			setSaving(false);
 		}

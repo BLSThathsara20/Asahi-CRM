@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SOURCES } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { appendLeadRow } from "../services/sheetsApi.js";
+import { formatSheetsThrownError } from "../utils/sheetsErrors.js";
 
 const initial = {
 	name: "",
@@ -69,7 +70,7 @@ export function AddLeadModal({ open, onClose, onSaved }) {
 			onSaved?.();
 			onClose();
 		} catch (err) {
-			setError(err?.message || "Could not save lead");
+			setError(formatSheetsThrownError(err));
 		} finally {
 			setSaving(false);
 		}
