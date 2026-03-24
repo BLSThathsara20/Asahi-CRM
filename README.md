@@ -41,11 +41,11 @@ npm run dev
 npm run build
 ```
 
-Output is in `dist/`. Production builds use `base: "/asahi-crm/"` in `vite.config.js` (change `GH_PAGES_BASE` if your GitHub repository name is not `asahi-crm`).
+Output is in `dist/`. Production builds use `base: "/Asahi-CRM/"` in `vite.config.js` (must match the GitHub repo name; see `GH_PAGES_BASE`).
 
 ## Publish on GitHub Pages
 
-1. Create an empty repository on GitHub (e.g. `asahi-crm`). The site will be at `https://<your-username>.github.io/asahi-crm/`.
+1. Create a repository on GitHub. For this project the site is `https://blsthathsara20.github.io/Asahi-CRM/` (pattern: `https://<username>.github.io/<repo>/`).
 
 2. In the repo on GitHub: **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions**.
 
@@ -64,15 +64,15 @@ Output is in `dist/`. Production builds use `base: "/asahi-crm/"` in `vite.confi
 
    - `your-username.github.io` (no `https://`, no path)
 
-6. After the first deploy, wait a minute and open `https://<your-username>.github.io/asahi-crm/`.
+6. After the first deploy, wait a minute and open `https://blsthathsara20.github.io/Asahi-CRM/`.
 
 ### Update the live site
 
 Push any commit to `main` (or `master`). The workflow runs again and replaces the published site.
 
-### If your repository name is not `asahi-crm`
+### If your repository name differs
 
-Edit `GH_PAGES_BASE` in `vite.config.js` to `"/<your-repo-name>/"` and push again.
+Edit `GH_PAGES_BASE` in `vite.config.js` to `"/<your-repo-name>/"` (leading/trailing slashes as in the example) and push again.
 
 ## Security notes
 
