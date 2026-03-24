@@ -5,10 +5,11 @@ import { BottomNav } from "./components/BottomNav.jsx";
 import { LeadBoard } from "./components/LeadBoard.jsx";
 import { LeadDetailPanel } from "./components/LeadDetailPanel.jsx";
 import { LoginPage } from "./components/LoginPage.jsx";
+import { SheetsConnectScreen } from "./components/SheetsConnectScreen.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 
 function CrmApp() {
-	const { user, authReady, signOutUser } = useAuth();
+	const { user, authReady, signOutUser, sheetsSessionReady } = useAuth();
 	const [selectedLead, setSelectedLead] = useState(null);
 	const [addOpen, setAddOpen] = useState(false);
 	const [refreshKey, setRefreshKey] = useState(0);
@@ -25,6 +26,11 @@ function CrmApp() {
 
 	if (!user) {
 		return <LoginPage />;
+	}
+
+	/* Firebase OK, but no Google Sheets OAuth token yet — don’t show empty CRM */
+	if (!sheetsSessionReady) {
+		return <SheetsConnectScreen />;
 	}
 
 	return (

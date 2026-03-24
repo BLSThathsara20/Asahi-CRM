@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Link2, RefreshCw, Search } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fetchLeadsRaw, parseLeads } from "../services/sheetsApi.js";
@@ -7,27 +7,21 @@ import { formatSheetsThrownError } from "../utils/sheetsErrors.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 
 export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
-	const {
-		getSheetsAccessToken,
-		connectSheetsAccess,
-		invalidateSheetsToken,
-	} = useAuth();
+	const { getSheetsAccessToken, invalidateSheetsToken } = useAuth();
 	const [leads, setLeads] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
-	const [needsSheets, setNeedsSheets] = useState(false);
 	const [search, setSearch] = useState("");
 	const [sourceFilter, setSourceFilter] = useState("");
 	const [statusFilter, setStatusFilter] = useState("");
 
 	const loadLeads = useCallback(async () => {
 		setError(null);
-		setNeedsSheets(false);
 		setLoading(true);
 		try {
 			const token = await getSheetsAccessToken();
 			if (!token) {
-				setNeedsSheets(true);
+				invalidateSheetsToken();
 				setLeads([]);
 				return;
 			}
@@ -41,10 +35,6 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 					e?.message === "UNAUTHORIZED"
 				) {
 					invalidateSheetsToken();
-					setNeedsSheets(true);
-					setError(
-						"Your Google Sheets session expired. Use the button below to allow access again.",
-					);
 					setLeads([]);
 					return;
 				}
@@ -86,30 +76,6 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 
 	return (
 		<div className="flex flex-col gap-4">
-			{needsSheets && (
-				<div
-					role="status"
-					className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-4 text-sm text-amber-950 ring-1 ring-amber-200/80"
-				>
-					<p className="font-medium">Allow Google Sheets</p>
-					<p className="mt-1.5 leading-relaxed opacity-95">
-						Sign-in uses a secure redirect (no pop-ups). One more
-						step lets this app read and update your lead sheet. You
-						won’t need to do this often — access is remembered for
-						about an hour.
-					</p>
-					<motion.button
-						type="button"
-						whileTap={{ scale: 0.99 }}
-						onClick={() => connectSheetsAccess()}
-						className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-900 px-4 py-2.5 text-sm font-medium text-white shadow-md hover:bg-amber-950"
-					>
-						<Link2 className="h-4 w-4" />
-						Allow Google Sheets access
-					</motion.button>
-				</div>
-			)}
-
 			<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
 				<div className="relative min-w-0 flex-1 sm:max-w-xs">
 					<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -201,9 +167,7 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 										colSpan={7}
 										className="px-4 py-12 text-center text-slate-500"
 									>
-										{needsSheets
-											? "Connect Google Sheets above to load leads."
-											: "No leads match your filters."}
+										No leads match your filters.
 									</td>
 								</tr>
 							) : (
@@ -255,9 +219,7 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 					</p>
 				) : filtered.length === 0 ? (
 					<p className="py-8 text-center text-sm text-slate-500">
-						{needsSheets
-							? "Connect Google Sheets above to load leads."
-							: "No leads match your filters."}
+						No leads match your filters.
 					</p>
 				) : (
 					filtered.map((lead, i) => (

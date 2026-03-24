@@ -10,6 +10,7 @@ import {
 	getRedirectResult,
 	GoogleAuthProvider,
 	onAuthStateChanged,
+	reauthenticateWithPopup,
 	reauthenticateWithRedirect,
 	signInWithRedirect,
 	signOut,
@@ -17,6 +18,7 @@ import {
 import { ALLOWED_EMAIL_DOMAINS } from "../constants.js";
 import { auth, isFirebaseConfigured } from "../firebase.js";
 import { getAuthErrorMessage } from "../utils/authErrors.js";
+import { extractGoogleAccessToken } from "../utils/googleOAuthToken.js";
 import {
 	clearStoredSheetsToken,
 	getStoredSheetsToken,
@@ -39,11 +41,6 @@ function googleProvider() {
 	return p;
 }
 
-function credentialAccessToken(result) {
-	const cred = GoogleAuthProvider.credentialFromResult(result);
-	return cred?.accessToken ?? null;
-}
-
 export function AuthProvider({ children }) {
 	const [user, setUser] = useState(null);
 	const [authReady, setAuthReady] = useState(false);
@@ -54,10 +51,19 @@ export function AuthProvider({ children }) {
 	const [authMessage, setAuthMessage] = useState(null);
 	const [signInLoading, setSignInLoading] = useState(false);
 
+	const syncTokenFromStorage = useCallback(() => {
+		const t = getStoredSheetsToken();
+		setSheetsTokenState(t);
+		return t;
+	}, []);
+
 	const invalidateSheetsToken = useCallback(() => {
 		clearStoredSheetsToken();
 		setSheetsTokenState(null);
 	}, []);
+
+	/** Firebase sign-in OK + valid cached Google OAuth token for Sheets */
+	const sheetsSessionReady = Boolean(sheetsToken);
 
 	useEffect(() => {
 		if (!auth) {
@@ -77,7 +83,7 @@ export function AuthProvider({ children }) {
 						setAccessDenied(true);
 					} else {
 						setAccessDenied(false);
-						const token = credentialAccessToken(result);
+						const token = extractGoogleAccessToken(result);
 						if (token) {
 							setStoredSheetsToken(token);
 							setSheetsTokenState(token);
@@ -143,23 +149,45 @@ export function AuthProvider({ children }) {
 	}, [invalidateSheetsToken]);
 
 	/**
-	 * Opens Google in the same tab (redirect). After you return, Sheets access is refreshed.
-	 * Use instead of popups — avoids Cross-Origin-Opener-Policy issues on GitHub Pages.
+	 * Prefer popup so we can read oauthAccessToken immediately (redirect often works too after fix).
+	 * Falls back to redirect if the browser blocks the popup.
 	 */
 	const connectSheetsAccess = useCallback(async () => {
 		if (!auth?.currentUser) return;
-		await reauthenticateWithRedirect(auth.currentUser, googleProvider());
+		try {
+			const result = await reauthenticateWithPopup(
+				auth.currentUser,
+				googleProvider(),
+			);
+			const token = extractGoogleAccessToken(result);
+			if (token) {
+				setStoredSheetsToken(token);
+				setSheetsTokenState(token);
+			} else {
+				throw new Error(
+					"Google did not return Sheets access. Confirm the spreadsheets scope is on your OAuth consent screen, then try again.",
+				);
+			}
+		} catch (e) {
+			const code = e?.code;
+			if (
+				code === "auth/popup-blocked" ||
+				code === "auth/cancelled-popup-request"
+			) {
+				await reauthenticateWithRedirect(
+					auth.currentUser,
+					googleProvider(),
+				);
+				return;
+			}
+			throw e;
+		}
 	}, []);
 
-	/** Returns cached OAuth token only — never opens a popup automatically. */
 	const getSheetsAccessToken = useCallback(async () => {
-		const t = sheetsToken || getStoredSheetsToken();
-		if (t) {
-			setSheetsTokenState(t);
-			return t;
-		}
-		return null;
-	}, [sheetsToken]);
+		const t = syncTokenFromStorage();
+		return t;
+	}, [syncTokenFromStorage]);
 
 	const value = useMemo(
 		() => ({
@@ -171,6 +199,7 @@ export function AuthProvider({ children }) {
 			clearAuthMessage,
 			signInLoading,
 			sheetsToken,
+			sheetsSessionReady,
 			signInWithGoogle,
 			signOutUser,
 			getSheetsAccessToken,
@@ -185,6 +214,7 @@ export function AuthProvider({ children }) {
 			clearAuthMessage,
 			signInLoading,
 			sheetsToken,
+			sheetsSessionReady,
 			signInWithGoogle,
 			signOutUser,
 			getSheetsAccessToken,
