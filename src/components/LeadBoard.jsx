@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { RefreshCw, Search } from "lucide-react";
+import { Link2, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fetchLeadsRaw, parseLeads } from "../services/sheetsApi.js";
@@ -7,29 +7,48 @@ import { formatSheetsThrownError } from "../utils/sheetsErrors.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 
 export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
-	const { getSheetsAccessToken, refreshSheetsToken } = useAuth();
+	const {
+		getSheetsAccessToken,
+		connectSheetsAccess,
+		invalidateSheetsToken,
+	} = useAuth();
 	const [leads, setLeads] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	const [needsSheets, setNeedsSheets] = useState(false);
 	const [search, setSearch] = useState("");
 	const [sourceFilter, setSourceFilter] = useState("");
 	const [statusFilter, setStatusFilter] = useState("");
 
 	const loadLeads = useCallback(async () => {
 		setError(null);
+		setNeedsSheets(false);
 		setLoading(true);
 		try {
-			let token = await getSheetsAccessToken();
+			const token = await getSheetsAccessToken();
+			if (!token) {
+				setNeedsSheets(true);
+				setLeads([]);
+				return;
+			}
+
 			let rows;
 			try {
 				rows = await fetchLeadsRaw(token);
 			} catch (e) {
-				if (e?.code === "UNAUTHORIZED" || e?.message === "UNAUTHORIZED") {
-					token = await refreshSheetsToken();
-					rows = await fetchLeadsRaw(token);
-				} else {
-					throw e;
+				if (
+					e?.code === "UNAUTHORIZED" ||
+					e?.message === "UNAUTHORIZED"
+				) {
+					invalidateSheetsToken();
+					setNeedsSheets(true);
+					setError(
+						"Your Google Sheets session expired. Use the button below to allow access again.",
+					);
+					setLeads([]);
+					return;
 				}
+				throw e;
 			}
 			setLeads(parseLeads(rows));
 		} catch (e) {
@@ -38,7 +57,7 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 		} finally {
 			setLoading(false);
 		}
-	}, [getSheetsAccessToken, refreshSheetsToken]);
+	}, [getSheetsAccessToken, invalidateSheetsToken]);
 
 	useEffect(() => {
 		loadLeads();
@@ -67,6 +86,30 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 
 	return (
 		<div className="flex flex-col gap-4">
+			{needsSheets && (
+				<div
+					role="status"
+					className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-4 text-sm text-amber-950 ring-1 ring-amber-200/80"
+				>
+					<p className="font-medium">Allow Google Sheets</p>
+					<p className="mt-1.5 leading-relaxed opacity-95">
+						Sign-in uses a secure redirect (no pop-ups). One more
+						step lets this app read and update your lead sheet. You
+						won’t need to do this often — access is remembered for
+						about an hour.
+					</p>
+					<motion.button
+						type="button"
+						whileTap={{ scale: 0.99 }}
+						onClick={() => connectSheetsAccess()}
+						className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-900 px-4 py-2.5 text-sm font-medium text-white shadow-md hover:bg-amber-950"
+					>
+						<Link2 className="h-4 w-4" />
+						Allow Google Sheets access
+					</motion.button>
+				</div>
+			)}
+
 			<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
 				<div className="relative min-w-0 flex-1 sm:max-w-xs">
 					<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -128,7 +171,7 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 			)}
 
 			{/* Desktop table */}
-			<div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
+			<div className="hidden overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm md:block">
 				<div className="max-h-[calc(100vh-16rem)] overflow-auto">
 					<table className="w-full min-w-[800px] border-collapse text-left text-sm">
 						<thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
@@ -145,14 +188,22 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 						<tbody>
 							{loading ? (
 								<tr>
-									<td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+									<td
+										colSpan={7}
+										className="px-4 py-12 text-center text-slate-500"
+									>
 										Loading leads…
 									</td>
 								</tr>
 							) : filtered.length === 0 ? (
 								<tr>
-									<td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-										No leads match your filters.
+									<td
+										colSpan={7}
+										className="px-4 py-12 text-center text-slate-500"
+									>
+										{needsSheets
+											? "Connect Google Sheets above to load leads."
+											: "No leads match your filters."}
 									</td>
 								</tr>
 							) : (
@@ -161,7 +212,9 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 										key={`${lead.sheetRow}-${i}`}
 										initial={{ opacity: 0 }}
 										animate={{ opacity: 1 }}
-										transition={{ delay: Math.min(i * 0.02, 0.3) }}
+										transition={{
+											delay: Math.min(i * 0.02, 0.3),
+										}}
 										onClick={() => onSelectLead(lead)}
 										className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/80"
 									>
@@ -195,14 +248,16 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 			</div>
 
 			{/* Mobile cards */}
-			<div className="md:hidden space-y-3 pb-24">
+			<div className="space-y-3 pb-24 md:hidden">
 				{loading ? (
 					<p className="py-8 text-center text-sm text-slate-500">
 						Loading leads…
 					</p>
 				) : filtered.length === 0 ? (
 					<p className="py-8 text-center text-sm text-slate-500">
-						No leads match your filters.
+						{needsSheets
+							? "Connect Google Sheets above to load leads."
+							: "No leads match your filters."}
 					</p>
 				) : (
 					filtered.map((lead, i) => (
@@ -227,7 +282,9 @@ export function LeadBoard({ onSelectLead, refreshKey = 0 }) {
 								<StatusBadge status={lead.status} />
 							</div>
 							<p className="mt-2 text-sm text-slate-600">{lead.car}</p>
-							<p className="mt-1 text-sm text-slate-500">{lead.phone}</p>
+							<p className="mt-1 text-sm text-slate-500">
+								{lead.phone}
+							</p>
 						</motion.button>
 					))
 				)}

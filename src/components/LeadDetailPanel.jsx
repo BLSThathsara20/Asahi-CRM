@@ -15,7 +15,10 @@ import { phoneToWaDigits } from "../utils/phone.js";
 import { StatusBadge } from "./StatusBadge.jsx";
 
 export function LeadDetailPanel({ lead, open, onClose, onSaved }) {
-	const { getSheetsAccessToken, refreshSheetsToken } = useAuth();
+	const {
+		getSheetsAccessToken,
+		invalidateSheetsToken,
+	} = useAuth();
 	const [status, setStatus] = useState(lead?.status || "New");
 	const [notes, setNotes] = useState(lead?.notes || "");
 	const [saving, setSaving] = useState(false);
@@ -29,13 +32,15 @@ export function LeadDetailPanel({ lead, open, onClose, onSaved }) {
 	}, [lead]);
 
 	async function withToken(fn) {
-		let token = await getSheetsAccessToken();
+		const token = await getSheetsAccessToken();
+		if (!token) {
+			throw new Error("SHEETS_NOT_CONNECTED");
+		}
 		try {
 			return await fn(token);
 		} catch (e) {
 			if (e?.code === "UNAUTHORIZED" || e?.message === "UNAUTHORIZED") {
-				token = await refreshSheetsToken();
-				return await fn(token);
+				invalidateSheetsToken();
 			}
 			throw e;
 		}

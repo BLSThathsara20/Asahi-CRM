@@ -7,10 +7,11 @@ import {
 	useState,
 } from "react";
 import {
+	getRedirectResult,
 	GoogleAuthProvider,
 	onAuthStateChanged,
-	reauthenticateWithPopup,
-	signInWithPopup,
+	reauthenticateWithRedirect,
+	signInWithRedirect,
 	signOut,
 } from "firebase/auth";
 import { ALLOWED_EMAIL_DOMAINS } from "../constants.js";
@@ -35,7 +36,6 @@ function emailAllowed(email) {
 function googleProvider() {
 	const p = new GoogleAuthProvider();
 	p.addScope(SHEETS_SCOPE);
-	p.setCustomParameters({ prompt: "select_account" });
 	return p;
 }
 
@@ -54,30 +54,66 @@ export function AuthProvider({ children }) {
 	const [authMessage, setAuthMessage] = useState(null);
 	const [signInLoading, setSignInLoading] = useState(false);
 
+	const invalidateSheetsToken = useCallback(() => {
+		clearStoredSheetsToken();
+		setSheetsTokenState(null);
+	}, []);
+
 	useEffect(() => {
 		if (!auth) {
 			setAuthReady(true);
 			return;
 		}
-		const unsub = onAuthStateChanged(auth, (u) => {
-			setUser(u);
-			if (!u) {
-				clearStoredSheetsToken();
-				setSheetsTokenState(null);
-			} else if (!emailAllowed(u.email)) {
-				setAccessDenied(true);
-				signOut(auth);
-				clearStoredSheetsToken();
-				setSheetsTokenState(null);
-			} else {
-				setAccessDenied(false);
-				const t = getStoredSheetsToken();
-				setSheetsTokenState(t);
+
+		let unsub = () => {};
+
+		(async () => {
+			try {
+				const result = await getRedirectResult(auth);
+				if (result?.user) {
+					const email = result.user.email;
+					if (!emailAllowed(email)) {
+						await signOut(auth);
+						setAccessDenied(true);
+					} else {
+						setAccessDenied(false);
+						const token = credentialAccessToken(result);
+						if (token) {
+							setStoredSheetsToken(token);
+							setSheetsTokenState(token);
+						}
+					}
+				}
+			} catch (e) {
+				console.error(e);
+				const code = e?.code;
+				if (code && code !== "auth/popup-closed-by-user") {
+					setAuthMessage({
+						type: "error",
+						message: getAuthErrorMessage(code, e?.message),
+					});
+				}
 			}
-			setAuthReady(true);
-		});
-		return unsub;
-	}, []);
+
+			unsub = onAuthStateChanged(auth, (u) => {
+				setUser(u);
+				if (!u) {
+					invalidateSheetsToken();
+				} else if (!emailAllowed(u.email)) {
+					setAccessDenied(true);
+					signOut(auth);
+					invalidateSheetsToken();
+				} else {
+					setAccessDenied(false);
+					const t = getStoredSheetsToken();
+					setSheetsTokenState(t);
+				}
+				setAuthReady(true);
+			});
+		})();
+
+		return () => unsub();
+	}, [invalidateSheetsToken]);
 
 	const clearAuthMessage = useCallback(() => setAuthMessage(null), []);
 
@@ -87,72 +123,43 @@ export function AuthProvider({ children }) {
 		setAuthMessage(null);
 		setSignInLoading(true);
 		try {
-			const result = await signInWithPopup(auth, googleProvider());
-			const email = result.user?.email;
-			if (!emailAllowed(email)) {
-				await signOut(auth);
-				clearStoredSheetsToken();
-				setSheetsTokenState(null);
-				setAccessDenied(true);
-				return;
-			}
-			const token = credentialAccessToken(result);
-			if (token) {
-				setStoredSheetsToken(token);
-				setSheetsTokenState(token);
-			}
-			if (!token) {
-				setAuthMessage({
-					type: "info",
-					message:
-						"Signed in, but Google Sheets access could not be granted. Sign out and try again, or check OAuth scopes in Google Cloud.",
-				});
-			}
+			await signInWithRedirect(auth, googleProvider());
 		} catch (e) {
 			const code = e?.code;
 			const msg = getAuthErrorMessage(code, e?.message);
-			if (
-				code === "auth/popup-closed-by-user" ||
-				code === "auth/cancelled-popup-request"
-			) {
-				setAuthMessage({ type: "info", message: msg });
-			} else {
-				setAuthMessage({ type: "error", message: msg });
-			}
+			setAuthMessage({
+				type: "error",
+				message: msg,
+			});
 			console.error(e);
-		} finally {
 			setSignInLoading(false);
 		}
 	}, []);
 
 	const signOutUser = useCallback(async () => {
 		if (!auth) return;
-		clearStoredSheetsToken();
-		setSheetsTokenState(null);
+		invalidateSheetsToken();
 		await signOut(auth);
+	}, [invalidateSheetsToken]);
+
+	/**
+	 * Opens Google in the same tab (redirect). After you return, Sheets access is refreshed.
+	 * Use instead of popups — avoids Cross-Origin-Opener-Policy issues on GitHub Pages.
+	 */
+	const connectSheetsAccess = useCallback(async () => {
+		if (!auth?.currentUser) return;
+		await reauthenticateWithRedirect(auth.currentUser, googleProvider());
 	}, []);
 
-	const refreshSheetsToken = useCallback(async () => {
-		if (!auth?.currentUser) throw new Error("Not signed in");
-		const result = await reauthenticateWithPopup(
-			auth.currentUser,
-			googleProvider(),
-		);
-		const token = credentialAccessToken(result);
-		if (!token) throw new Error("No Google access token");
-		setStoredSheetsToken(token);
-		setSheetsTokenState(token);
-		return token;
-	}, []);
-
+	/** Returns cached OAuth token only — never opens a popup automatically. */
 	const getSheetsAccessToken = useCallback(async () => {
-		let t = sheetsToken || getStoredSheetsToken();
+		const t = sheetsToken || getStoredSheetsToken();
 		if (t) {
 			setSheetsTokenState(t);
 			return t;
 		}
-		return refreshSheetsToken();
-	}, [sheetsToken, refreshSheetsToken]);
+		return null;
+	}, [sheetsToken]);
 
 	const value = useMemo(
 		() => ({
@@ -167,7 +174,8 @@ export function AuthProvider({ children }) {
 			signInWithGoogle,
 			signOutUser,
 			getSheetsAccessToken,
-			refreshSheetsToken,
+			connectSheetsAccess,
+			invalidateSheetsToken,
 		}),
 		[
 			authReady,
@@ -180,7 +188,8 @@ export function AuthProvider({ children }) {
 			signInWithGoogle,
 			signOutUser,
 			getSheetsAccessToken,
-			refreshSheetsToken,
+			connectSheetsAccess,
+			invalidateSheetsToken,
 		],
 	);
 

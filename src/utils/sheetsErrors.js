@@ -59,6 +59,9 @@ export function formatSheetsThrownError(err) {
 	if (!err?.message) return "Something went wrong with Google Sheets.";
 	const m = err.message;
 	if (m === "UNAUTHORIZED") return m;
+	if (m === "SHEETS_NOT_CONNECTED") {
+		return "Google Sheets isn’t connected. On the lead list, tap “Allow Google Sheets access”, complete the Google step, then try again.";
+	}
 	if (m.startsWith("{")) {
 		try {
 			const p = JSON.parse(m);

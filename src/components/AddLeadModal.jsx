@@ -16,7 +16,10 @@ const initial = {
 };
 
 export function AddLeadModal({ open, onClose, onSaved }) {
-	const { getSheetsAccessToken, refreshSheetsToken } = useAuth();
+	const {
+		getSheetsAccessToken,
+		invalidateSheetsToken,
+	} = useAuth();
 	const [form, setForm] = useState(initial);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState(null);
@@ -33,13 +36,15 @@ export function AddLeadModal({ open, onClose, onSaved }) {
 	}
 
 	async function withToken(fn) {
-		let token = await getSheetsAccessToken();
+		const token = await getSheetsAccessToken();
+		if (!token) {
+			throw new Error("SHEETS_NOT_CONNECTED");
+		}
 		try {
 			return await fn(token);
 		} catch (e) {
 			if (e?.code === "UNAUTHORIZED" || e?.message === "UNAUTHORIZED") {
-				token = await refreshSheetsToken();
-				return await fn(token);
+				invalidateSheetsToken();
 			}
 			throw e;
 		}
