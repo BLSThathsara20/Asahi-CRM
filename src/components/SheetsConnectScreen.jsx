@@ -82,8 +82,8 @@ export function SheetsConnectScreen() {
 				</motion.button>
 
 				<p className="mt-4 text-center text-xs text-slate-400">
-					If the browser blocks the window, we use a full-page sign-in
-					instead. Allow popups for this site if you can.
+					Allow pop-ups for this site if the Google window does not
+					open.
 				</p>
 
 				<button

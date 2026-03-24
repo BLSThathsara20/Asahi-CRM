@@ -44,8 +44,8 @@ export function LoginPage() {
 							Sign in with your company Google account
 						</p>
 						<p className="mt-2 text-xs text-slate-400">
-							Uses a secure page redirect (not a pop-up), which works
-							better on this site.
+							A small Google window opens to sign you in. Allow
+							pop-ups for this site if asked.
 						</p>
 					</div>
 				</div>

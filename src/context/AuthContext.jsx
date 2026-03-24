@@ -11,8 +11,7 @@ import {
 	GoogleAuthProvider,
 	onAuthStateChanged,
 	reauthenticateWithPopup,
-	reauthenticateWithRedirect,
-	signInWithRedirect,
+	signInWithPopup,
 	signOut,
 } from "firebase/auth";
 import { ALLOWED_EMAIL_DOMAINS } from "../constants.js";
@@ -129,15 +128,39 @@ export function AuthProvider({ children }) {
 		setAuthMessage(null);
 		setSignInLoading(true);
 		try {
-			await signInWithRedirect(auth, googleProvider());
+			/* Popup sign-in: required when the app is NOT on Firebase Hosting.
+			   Redirect sign-in loads firebaseapp.com/__/auth/handler which needs
+			   /__/firebase/init.json — only served by Firebase Hosting (404 on GH Pages). */
+			const result = await signInWithPopup(auth, googleProvider());
+			const email = result.user?.email;
+			if (!emailAllowed(email)) {
+				await signOut(auth);
+				clearStoredSheetsToken();
+				setSheetsTokenState(null);
+				setAccessDenied(true);
+				return;
+			}
+			const token = extractGoogleAccessToken(result);
+			if (token) {
+				setStoredSheetsToken(token);
+				setSheetsTokenState(token);
+			}
 		} catch (e) {
 			const code = e?.code;
 			const msg = getAuthErrorMessage(code, e?.message);
-			setAuthMessage({
-				type: "error",
-				message: msg,
-			});
+			if (
+				code === "auth/popup-closed-by-user" ||
+				code === "auth/cancelled-popup-request"
+			) {
+				setAuthMessage({ type: "info", message: msg });
+			} else {
+				setAuthMessage({
+					type: "error",
+					message: msg,
+				});
+			}
 			console.error(e);
+		} finally {
 			setSignInLoading(false);
 		}
 	}, []);
@@ -148,39 +171,20 @@ export function AuthProvider({ children }) {
 		await signOut(auth);
 	}, [invalidateSheetsToken]);
 
-	/**
-	 * Prefer popup so we can read oauthAccessToken immediately (redirect often works too after fix).
-	 * Falls back to redirect if the browser blocks the popup.
-	 */
 	const connectSheetsAccess = useCallback(async () => {
 		if (!auth?.currentUser) return;
-		try {
-			const result = await reauthenticateWithPopup(
-				auth.currentUser,
-				googleProvider(),
+		const result = await reauthenticateWithPopup(
+			auth.currentUser,
+			googleProvider(),
+		);
+		const token = extractGoogleAccessToken(result);
+		if (token) {
+			setStoredSheetsToken(token);
+			setSheetsTokenState(token);
+		} else {
+			throw new Error(
+				"Google did not return Sheets access. Confirm the spreadsheets scope is on your OAuth consent screen, then try again.",
 			);
-			const token = extractGoogleAccessToken(result);
-			if (token) {
-				setStoredSheetsToken(token);
-				setSheetsTokenState(token);
-			} else {
-				throw new Error(
-					"Google did not return Sheets access. Confirm the spreadsheets scope is on your OAuth consent screen, then try again.",
-				);
-			}
-		} catch (e) {
-			const code = e?.code;
-			if (
-				code === "auth/popup-blocked" ||
-				code === "auth/cancelled-popup-request"
-			) {
-				await reauthenticateWithRedirect(
-					auth.currentUser,
-					googleProvider(),
-				);
-				return;
-			}
-			throw e;
 		}
 	}, []);
 
