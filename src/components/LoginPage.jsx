@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Loader2, LogIn, X } from "lucide-react";
-import { LOGO_URL } from "../constants.js";
+import { formatAllowedDomainsForUi, LOGO_URL } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function LoginPage() {
@@ -66,11 +66,12 @@ export function LoginPage() {
 						animate={{ opacity: 1, height: "auto" }}
 						className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200/80"
 					>
-						<strong>Access denied.</strong> Only{" "}
+						<strong>Access denied.</strong> Only company accounts
+						on{" "}
 						<code className="rounded bg-rose-100/80 px-1 text-xs">
-							@asahimotors.co.uk
+							{formatAllowedDomainsForUi()}
 						</code>{" "}
-						accounts can use this app.
+						can use this app.
 					</motion.p>
 				)}
 

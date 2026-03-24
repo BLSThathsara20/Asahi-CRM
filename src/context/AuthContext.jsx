@@ -13,7 +13,7 @@ import {
 	signInWithPopup,
 	signOut,
 } from "firebase/auth";
-import { ALLOWED_EMAIL_DOMAIN } from "../constants.js";
+import { ALLOWED_EMAIL_DOMAINS } from "../constants.js";
 import { auth, isFirebaseConfigured } from "../firebase.js";
 import { getAuthErrorMessage } from "../utils/authErrors.js";
 import {
@@ -28,7 +28,8 @@ const AuthContext = createContext(null);
 
 function emailAllowed(email) {
 	if (!email) return false;
-	return email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN.toLowerCase());
+	const lower = email.toLowerCase();
+	return ALLOWED_EMAIL_DOMAINS.some((d) => lower.endsWith(d.toLowerCase()));
 }
 
 function googleProvider() {

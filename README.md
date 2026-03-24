@@ -76,6 +76,6 @@ Edit `GH_PAGES_BASE` in `vite.config.js` to `"/<your-repo-name>/"` (leading/trai
 
 ## Security notes
 
-- Only `@asahimotors.co.uk` accounts can use the app after sign-in; others see **Access denied** and are signed out.
+- Only `@asahigroup.co.uk` or `@asahimotors.co.uk` accounts can use the app after sign-in; others see **Access denied** and are signed out. Edit `ALLOWED_EMAIL_DOMAINS` in `src/constants.js` to change this.
 - Environment variables are embedded in the client bundle; restrict Firebase and OAuth usage with authorized domains and Firebase security rules as appropriate.
 - The Google OAuth token is stored in `localStorage` for Sheets access until it expires; users may be prompted to re-authenticate when it expires.

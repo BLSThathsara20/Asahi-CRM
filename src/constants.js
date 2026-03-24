@@ -1,6 +1,15 @@
 export const SHEET_ID = "1InIVCf23cdlOZHsvl25uQUut9O9HPGlFJBeoYen-aAs";
 export const SHEET_NAME = "All leads";
-export const ALLOWED_EMAIL_DOMAIN = "@asahimotors.co.uk";
+
+/** Sign-in allowed only for these email suffixes (lowercase). */
+export const ALLOWED_EMAIL_DOMAINS = [
+	"@asahigroup.co.uk",
+	"@asahimotors.co.uk",
+];
+
+export function formatAllowedDomainsForUi() {
+	return ALLOWED_EMAIL_DOMAINS.join(" · ");
+}
 
 export const LOGO_URL =
 	"https://asahigroup.co.uk/admin/uploaded_photos/site_logo.png";
