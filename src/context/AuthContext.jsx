@@ -15,6 +15,7 @@ import {
 } from "firebase/auth";
 import { ALLOWED_EMAIL_DOMAIN } from "../constants.js";
 import { auth, isFirebaseConfigured } from "../firebase.js";
+import { getAuthErrorMessage } from "../utils/authErrors.js";
 import {
 	clearStoredSheetsToken,
 	getStoredSheetsToken,
@@ -49,6 +50,8 @@ export function AuthProvider({ children }) {
 	const [sheetsToken, setSheetsTokenState] = useState(() =>
 		getStoredSheetsToken(),
 	);
+	const [authMessage, setAuthMessage] = useState(null);
+	const [signInLoading, setSignInLoading] = useState(false);
 
 	useEffect(() => {
 		if (!auth) {
@@ -75,9 +78,13 @@ export function AuthProvider({ children }) {
 		return unsub;
 	}, []);
 
+	const clearAuthMessage = useCallback(() => setAuthMessage(null), []);
+
 	const signInWithGoogle = useCallback(async () => {
 		if (!auth) return;
 		setAccessDenied(false);
+		setAuthMessage(null);
+		setSignInLoading(true);
 		try {
 			const result = await signInWithPopup(auth, googleProvider());
 			const email = result.user?.email;
@@ -93,9 +100,27 @@ export function AuthProvider({ children }) {
 				setStoredSheetsToken(token);
 				setSheetsTokenState(token);
 			}
+			if (!token) {
+				setAuthMessage({
+					type: "info",
+					message:
+						"Signed in, but Google Sheets access could not be granted. Sign out and try again, or check OAuth scopes in Google Cloud.",
+				});
+			}
 		} catch (e) {
-			if (e?.code === "auth/popup-closed-by-user") return;
+			const code = e?.code;
+			const msg = getAuthErrorMessage(code, e?.message);
+			if (
+				code === "auth/popup-closed-by-user" ||
+				code === "auth/cancelled-popup-request"
+			) {
+				setAuthMessage({ type: "info", message: msg });
+			} else {
+				setAuthMessage({ type: "error", message: msg });
+			}
 			console.error(e);
+		} finally {
+			setSignInLoading(false);
 		}
 	}, []);
 
@@ -134,6 +159,9 @@ export function AuthProvider({ children }) {
 			authReady,
 			user,
 			accessDenied,
+			authMessage,
+			clearAuthMessage,
+			signInLoading,
 			sheetsToken,
 			signInWithGoogle,
 			signOutUser,
@@ -144,6 +172,9 @@ export function AuthProvider({ children }) {
 			authReady,
 			user,
 			accessDenied,
+			authMessage,
+			clearAuthMessage,
+			signInLoading,
 			sheetsToken,
 			signInWithGoogle,
 			signOutUser,

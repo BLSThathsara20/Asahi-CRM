@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { LogIn } from "lucide-react";
+import { Loader2, LogIn, X } from "lucide-react";
 import { LOGO_URL } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -9,17 +9,25 @@ export function LoginPage() {
 		signInWithGoogle,
 		accessDenied,
 		authReady,
+		authMessage,
+		clearAuthMessage,
+		signInLoading,
 	} = useAuth();
 
+	const msgStyles =
+		authMessage?.type === "info"
+			? "bg-amber-50 text-amber-950 ring-amber-200/80"
+			: "bg-rose-50 text-rose-900 ring-rose-200/80";
+
 	return (
-		<div className="min-h-screen flex flex-col items-center justify-center px-6 py-16 bg-gradient-to-b from-slate-50 via-white to-slate-50">
+		<div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-6 py-16">
 			<motion.div
 				initial={{ opacity: 0, y: 12 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
 				className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white/90 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-sm"
 			>
-				<div className="flex flex-col items-center gap-4 mb-8">
+				<div className="mb-8 flex flex-col items-center gap-4">
 					<motion.img
 						src={LOGO_URL}
 						alt="Asahi Motors"
@@ -66,16 +74,56 @@ export function LoginPage() {
 					</motion.p>
 				)}
 
+				{authMessage && (
+					<motion.div
+						role="alert"
+						initial={{ opacity: 0, y: -4 }}
+						animate={{ opacity: 1, y: 0 }}
+						className={`relative mb-4 rounded-xl px-4 py-3 pr-10 text-sm ring-1 ${msgStyles}`}
+					>
+						<p className="font-medium leading-snug">
+							{authMessage.type === "error"
+								? "Sign-in problem"
+								: "Notice"}
+						</p>
+						<p className="mt-1.5 leading-relaxed opacity-95">
+							{authMessage.message}
+						</p>
+						<button
+							type="button"
+							onClick={() => clearAuthMessage()}
+							className="absolute right-2 top-2 rounded-lg p-1.5 opacity-70 transition-opacity hover:bg-black/5 hover:opacity-100"
+							aria-label="Dismiss message"
+						>
+							<X className="h-4 w-4" />
+						</button>
+					</motion.div>
+				)}
+
 				<motion.button
 					type="button"
 					whileTap={{ scale: 0.98 }}
-					whileHover={{ scale: 1.01 }}
-					disabled={!isFirebaseConfigured || !authReady}
+					whileHover={{ scale: signInLoading ? 1 : 1.01 }}
+					disabled={
+						!isFirebaseConfigured || !authReady || signInLoading
+					}
 					onClick={() => signInWithGoogle()}
 					className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition-[box-shadow,opacity] hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50"
 				>
-					<LogIn className="h-5 w-5 opacity-90" aria-hidden />
-					Sign in with Google
+					{signInLoading ? (
+						<>
+							<Loader2
+								className="h-5 w-5 shrink-0 animate-spin opacity-90"
+								aria-hidden
+							/>
+							Signing in…
+						</>
+					) : (
+						<>
+							<LogIn className="h-5 w-5 opacity-90" aria-hidden />
+							Sign in with Google
+						</>
+					)}
 				</motion.button>
 			</motion.div>
 		</div>
