@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
-import { LogOut, Plus } from "lucide-react";
+import { ArrowLeft, LogOut, Plus, Users } from "lucide-react";
 import { LOGO_URL } from "../constants.js";
 
 export function AppShell({
 	children,
 	onSignOut,
 	onAddLead,
+	onManageAccess,
+	onBack,
 	title = "Leads",
 }) {
 	return (
@@ -13,6 +15,16 @@ export function AppShell({
 			<header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
 				<div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
 					<div className="flex min-w-0 items-center gap-3">
+						{onBack && (
+							<button
+								type="button"
+								onClick={onBack}
+								className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:text-slate-900"
+								title="Back"
+							>
+								<ArrowLeft className="h-5 w-5" />
+							</button>
+						)}
 						<img
 							src={LOGO_URL}
 							alt=""
@@ -28,15 +40,27 @@ export function AppShell({
 						</div>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
-						<motion.button
-							type="button"
-							whileTap={{ scale: 0.98 }}
-							onClick={onAddLead}
-							className="hidden items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-md shadow-slate-900/15 sm:inline-flex"
-						>
-							<Plus className="h-4 w-4" />
-							Add lead
-						</motion.button>
+						{onAddLead && (
+							<motion.button
+								type="button"
+								whileTap={{ scale: 0.98 }}
+								onClick={onAddLead}
+								className="hidden items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-md shadow-slate-900/15 sm:inline-flex"
+							>
+								<Plus className="h-4 w-4" />
+								Add lead
+							</motion.button>
+						)}
+						{onManageAccess && (
+							<button
+								type="button"
+								onClick={onManageAccess}
+								className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:text-slate-900"
+								title="Manage access"
+							>
+								<Users className="h-5 w-5" />
+							</button>
+						)}
 						<button
 							type="button"
 							onClick={onSignOut}

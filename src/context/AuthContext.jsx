@@ -14,9 +14,12 @@ import {
 	signInWithPopup,
 	signOut,
 } from "firebase/auth";
-import { ALLOWED_EMAIL_DOMAINS } from "../constants.js";
-import { auth, isFirebaseConfigured } from "../firebase.js";
+import { auth, db, isFirebaseConfigured } from "../firebase.js";
 import { getAuthErrorMessage } from "../utils/authErrors.js";
+import {
+	canAccessApp,
+	isSuperAdminEmail,
+} from "../utils/accessControl.js";
 import { extractGoogleAccessToken } from "../utils/googleOAuthToken.js";
 import {
 	clearStoredSheetsToken,
@@ -27,12 +30,6 @@ import {
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
 const AuthContext = createContext(null);
-
-function emailAllowed(email) {
-	if (!email) return false;
-	const lower = email.toLowerCase();
-	return ALLOWED_EMAIL_DOMAINS.some((d) => lower.endsWith(d.toLowerCase()));
-}
 
 function googleProvider() {
 	const p = new GoogleAuthProvider();
@@ -77,7 +74,8 @@ export function AuthProvider({ children }) {
 				const result = await getRedirectResult(auth);
 				if (result?.user) {
 					const email = result.user.email;
-					if (!emailAllowed(email)) {
+					const ok = await canAccessApp(email, db);
+					if (!ok) {
 						await signOut(auth);
 						setAccessDenied(true);
 					} else {
@@ -100,19 +98,28 @@ export function AuthProvider({ children }) {
 				}
 			}
 
-			unsub = onAuthStateChanged(auth, (u) => {
-				setUser(u);
+			unsub = onAuthStateChanged(auth, async (u) => {
 				if (!u) {
 					invalidateSheetsToken();
-				} else if (!emailAllowed(u.email)) {
-					setAccessDenied(true);
-					signOut(auth);
-					invalidateSheetsToken();
-				} else {
+					setUser(null);
 					setAccessDenied(false);
-					const t = getStoredSheetsToken();
-					setSheetsTokenState(t);
+					setAuthReady(true);
+					return;
 				}
+				setAuthReady(false);
+				const ok = await canAccessApp(u.email, db);
+				if (!ok) {
+					setAccessDenied(true);
+					await signOut(auth);
+					invalidateSheetsToken();
+					setUser(null);
+					setAuthReady(true);
+					return;
+				}
+				setAccessDenied(false);
+				setUser(u);
+				const t = getStoredSheetsToken();
+				setSheetsTokenState(t);
 				setAuthReady(true);
 			});
 		})();
@@ -133,7 +140,8 @@ export function AuthProvider({ children }) {
 			   /__/firebase/init.json — only served by Firebase Hosting (404 on GH Pages). */
 			const result = await signInWithPopup(auth, googleProvider());
 			const email = result.user?.email;
-			if (!emailAllowed(email)) {
+			const ok = await canAccessApp(email, db);
+			if (!ok) {
 				await signOut(auth);
 				clearStoredSheetsToken();
 				setSheetsTokenState(null);
@@ -193,11 +201,14 @@ export function AuthProvider({ children }) {
 		return t;
 	}, [syncTokenFromStorage]);
 
+	const isSuperAdmin = isSuperAdminEmail(user?.email);
+
 	const value = useMemo(
 		() => ({
 			isFirebaseConfigured,
 			authReady,
 			user,
+			isSuperAdmin,
 			accessDenied,
 			authMessage,
 			clearAuthMessage,
@@ -213,6 +224,7 @@ export function AuthProvider({ children }) {
 		[
 			authReady,
 			user,
+			isSuperAdmin,
 			accessDenied,
 			authMessage,
 			clearAuthMessage,

@@ -1,6 +1,6 @@
 # Asahi CRM
 
-Internal lead CRM for Asahi Motors: Google sign-in (company domain only), lead board backed by Google Sheets, and a mobile-friendly UI (Tailwind CSS, Framer Motion).
+Internal lead CRM for Asahi Motors: Google sign-in (company domains, super admin, and invited users), lead board backed by Google Sheets, and a mobile-friendly UI (Tailwind CSS, Framer Motion).
 
 ## Prerequisites
 
@@ -17,16 +17,20 @@ Spreadsheet: sheet named **All leads**, columns **Date, Name, Phone, Email, Car,
 
 2. In Firebase **Authentication → Sign-in method**, enable **Google**.
 
-3. In [Google Cloud Console](https://console.cloud.google.com/) select the **same project** as Firebase (e.g. `asahi-crm`), then:
+3. In Firebase **Build → Firestore Database**, create a database (production mode is fine once rules are deployed). The app uses collection **`crmExtraAllowedUsers`** for invited emails (see security rules below).
+
+4. In [Google Cloud Console](https://console.cloud.google.com/) select the **same project** as Firebase (e.g. `asahi-crm`), then:
 
    - Enable **Google Sheets API** (direct link for that API: [Enable Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com) — pick your project in the header if asked).
    - **APIs & Services → OAuth consent screen**: add the scope  
      `https://www.googleapis.com/auth/spreadsheets`  
      (or use “manually add scopes” if needed).
 
-4. Under **Authentication → Settings → Authorized domains**, add your production host (e.g. `yourname.github.io`) when you deploy.
+5. Under **Authentication → Settings → Authorized domains**, add your production host (e.g. `yourname.github.io`) when you deploy.
 
-5. Copy `.env.example` to `.env`, fill in all `VITE_FIREBASE_*` values, then restart `npm run dev`.
+6. Deploy Firestore rules so the super admin can manage invites: either paste the contents of **`firestore.rules`** into **Firestore → Rules** in the Firebase Console, or run `firebase deploy --only firestore:rules` from a project with `firebase.json` pointing at that rules file. The rules allow **`sales@asahigroup.co.uk`** to create/delete documents in **`crmExtraAllowedUsers`**; any signed-in user can read that collection (the app still enforces access at sign-in).
+
+7. Copy `.env.example` to `.env`, fill in all `VITE_FIREBASE_*` values, then restart `npm run dev`.
 
 ## Local development
 
@@ -76,6 +80,7 @@ Edit `GH_PAGES_BASE` in `vite.config.js` to `"/<your-repo-name>/"` (leading/trai
 
 ## Security notes
 
-- Only `@asahigroup.co.uk` or `@asahimotors.co.uk` accounts can use the app after sign-in; others see **Access denied** and are signed out. Edit `ALLOWED_EMAIL_DOMAINS` in `src/constants.js` to change this.
+- Sign-in is allowed if the Google account is on `ALLOWED_EMAIL_DOMAINS` (`src/constants.js`), is the super admin (`SUPER_ADMIN_EMAILS`, default `sales@asahigroup.co.uk`), or has a document in Firestore **`crmExtraAllowedUsers`** whose document ID is their email in lowercase. The super admin can add/remove those invites from **Manage access** (users icon) after signing in.
+- Others see **Access denied** and are signed out.
 - Environment variables are embedded in the client bundle; restrict Firebase and OAuth usage with authorized domains and Firebase security rules as appropriate.
 - The Google OAuth token is stored in `localStorage` for Sheets access until it expires; users may be prompted to re-authenticate when it expires.

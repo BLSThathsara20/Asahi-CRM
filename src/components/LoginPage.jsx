@@ -70,12 +70,13 @@ export function LoginPage() {
 						animate={{ opacity: 1, height: "auto" }}
 						className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200/80"
 					>
-						<strong>Access denied.</strong> Only company accounts
-						on{" "}
+						<strong>Access denied.</strong> This app is for company
+						accounts on{" "}
 						<code className="rounded bg-rose-100/80 px-1 text-xs">
 							{formatAllowedDomainsForUi()}
-						</code>{" "}
-						can use this app.
+						</code>
+						, or Google accounts your admin has invited. Ask your
+						team if you need access.
 					</motion.p>
 				)}
 
