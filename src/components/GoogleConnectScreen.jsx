@@ -1,15 +1,16 @@
 import { motion } from "framer-motion";
 import { Link2, Loader2, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { LOGO_URL } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 /**
- * Shown after Firebase sign-in until Google Sheets OAuth token is stored.
- * Keeps the main CRM hidden until data access is ready.
+ * Shown after Firebase sign-in until a Google access token for Gmail is stored.
  */
-export function SheetsConnectScreen() {
-	const { connectSheetsAccess, signOutUser, user } = useAuth();
+export function GoogleConnectScreen() {
+	const { connectGoogleAccess, signOutUser, user } = useAuth();
+	const navigate = useNavigate();
 	const [busy, setBusy] = useState(false);
 	const [localError, setLocalError] = useState(null);
 
@@ -17,11 +18,12 @@ export function SheetsConnectScreen() {
 		setLocalError(null);
 		setBusy(true);
 		try {
-			await connectSheetsAccess();
+			await connectGoogleAccess();
+			navigate("/dashboard", { replace: true });
 		} catch (e) {
 			setLocalError(
 				e?.message ||
-					"Could not connect Google Sheets. Try again or sign out.",
+					"Could not connect Google. Try again or sign out.",
 			);
 		} finally {
 			setBusy(false);
@@ -42,7 +44,7 @@ export function SheetsConnectScreen() {
 						className="h-12 w-auto object-contain"
 					/>
 					<h1 className="text-center text-xl font-semibold text-slate-900">
-						Connect Google Sheets
+						Connect Gmail
 					</h1>
 					<p className="text-center text-sm text-slate-500">
 						Signed in as{" "}
@@ -53,8 +55,10 @@ export function SheetsConnectScreen() {
 				</div>
 
 				<p className="mb-6 text-center text-sm leading-relaxed text-slate-600">
-					Sign-in is complete. Approve access once so this app can load
-					and save leads in your spreadsheet.
+					Your password login doesn’t include Gmail. Link your Google account
+					once so we can <strong>read</strong> enquiry mail and apply labels.
+					If you already use Google sign-in, this refreshes the same access.
+					CRM data still lives in <strong>Sanity</strong>.
 				</p>
 
 				{localError && (
@@ -78,12 +82,20 @@ export function SheetsConnectScreen() {
 					) : (
 						<Link2 className="h-5 w-5" />
 					)}
-					{busy ? "Opening Google…" : "Allow Google Sheets access"}
+					{busy ? "Opening Google…" : "Continue with Google"}
 				</motion.button>
 
 				<p className="mt-4 text-center text-xs text-slate-400">
-					Allow pop-ups for this site if the Google window does not
-					open.
+					Allow pop-ups. If you see a scope error, confirm{" "}
+					<code className="rounded bg-slate-100 px-1">
+						gmail.readonly
+					</code>{" "}
+					and{" "}
+					<code className="rounded bg-slate-100 px-1">
+						gmail.modify
+					</code>{" "}
+					are on your Cloud project OAuth consent screen, then try
+					<strong> Continue with Google</strong> again.
 				</p>
 
 				<button

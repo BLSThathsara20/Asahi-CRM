@@ -13,3 +13,21 @@
 			"Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 	}
 }
+
+/* Lead list: “new today” notification hint (infinite, subtle). */
+@keyframes lead-notify-pulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.15);
+		opacity: 0.72;
+	}
+}
+
+.lead-notify-bell {
+	animation: lead-notify-pulse 1.25s ease-in-out infinite;
+	will-change: transform, opacity;
+}

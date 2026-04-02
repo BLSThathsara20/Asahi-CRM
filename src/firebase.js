@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
 	apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,5 +16,3 @@ export const isFirebaseConfigured = Boolean(
 
 const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;
-/** Used for invited-user allowlist (enable Firestore in Firebase Console). */
-export const db = app ? getFirestore(app) : null;

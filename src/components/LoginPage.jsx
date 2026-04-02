@@ -1,11 +1,20 @@
 import { motion } from "framer-motion";
-import { Loader2, LogIn, X } from "lucide-react";
+import { ArrowLeft, Loader2, LogIn, Mail, X } from "lucide-react";
+import { useState } from "react";
 import { formatAllowedDomainsForUi, LOGO_URL } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { isFirebaseConfigured } from "../firebase.js";
+import { signInAllowed } from "../utils/accessControl.js";
+import { isCrmAccessGranted } from "../utils/crmAccessGate.js";
+
+/**
+ * @typedef {"email" | "password" | "denied"} LoginStep
+ */
 
 export function LoginPage() {
 	const {
-		isFirebaseConfigured,
+		signInWithEmailPassword,
+		sendPasswordReset,
 		signInWithGoogle,
 		accessDenied,
 		authReady,
@@ -14,10 +23,49 @@ export function LoginPage() {
 		signInLoading,
 	} = useAuth();
 
+	const [step, setStep] = useState(/** @type {LoginStep} */ ("email"));
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [checkLoading, setCheckLoading] = useState(false);
+
 	const msgStyles =
 		authMessage?.type === "info"
 			? "bg-amber-50 text-amber-950 ring-amber-200/80"
 			: "bg-rose-50 text-rose-900 ring-rose-200/80";
+
+	function goBackToEmail() {
+		setStep("email");
+		setPassword("");
+		clearAuthMessage();
+	}
+
+	async function handleCheckEmail() {
+		clearAuthMessage();
+		const em = String(email || "").trim();
+		if (!signInAllowed(em)) {
+			setStep("denied");
+			return;
+		}
+		setCheckLoading(true);
+		try {
+			const granted = await isCrmAccessGranted(em.toLowerCase());
+			if (!granted) {
+				setStep("denied");
+				return;
+			}
+			// Always show the password step: Firebase “email enumeration protection”
+			// often hides whether `password` sign-in exists, which wrongly sent users to
+			// “setup required” after they had already set a password.
+			setStep("password");
+		} finally {
+			setCheckLoading(false);
+		}
+	}
+
+	async function handleSubmitPassword(e) {
+		e.preventDefault();
+		await signInWithEmailPassword(email, password);
+	}
 
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-6 py-16">
@@ -41,11 +89,17 @@ export function LoginPage() {
 							Asahi CRM
 						</h1>
 						<p className="mt-1 text-sm text-slate-500">
-							Sign in with your company Google account
+							{step === "email" && "Enter your work email"}
+							{step === "password" && "Sign in"}
+							{step === "denied" && "No access"}
 						</p>
 						<p className="mt-2 text-xs text-slate-400">
-							A small Google window opens to sign you in. Allow
-							pop-ups for this site if asked.
+							Admins manage people in <strong>Team</strong>. Superadmins can issue
+							a one-time link to create a password. Allowed domains:{" "}
+							<strong className="font-medium text-slate-600">
+								{formatAllowedDomainsForUi()}
+							</strong>
+							.
 						</p>
 					</div>
 				</div>
@@ -56,31 +110,48 @@ export function LoginPage() {
 						<code className="rounded bg-amber-100/80 px-1 text-xs">
 							VITE_FIREBASE_*
 						</code>{" "}
-						to{" "}
-						<code className="rounded bg-amber-100/80 px-1 text-xs">
-							.env
-						</code>{" "}
-						and restart the dev server.
+						to <code className="rounded bg-amber-100/80 px-1 text-xs">.env</code>{" "}
+						and restart.
 					</p>
 				)}
 
-				{accessDenied && (
+				{step === "denied" ? (
+					<div className="space-y-4">
+						<p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200/80">
+							<strong>You don’t have access.</strong> This email isn’t allowed for
+							this app. Use a company address or ask an admin to add you in{" "}
+							<strong>Team</strong> / Sanity, or check{" "}
+							<code className="rounded bg-rose-100/80 px-1 text-xs">
+								VITE_SUPERADMIN_EMAILS
+							</code>
+							.
+						</p>
+						<button
+							type="button"
+							onClick={() => {
+								setStep("email");
+								setEmail("");
+							}}
+							className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+						>
+							<ArrowLeft className="h-4 w-4" />
+							Try a different email
+						</button>
+					</div>
+				) : null}
+
+				{accessDenied && step !== "denied" ? (
 					<motion.p
 						initial={{ opacity: 0, height: 0 }}
 						animate={{ opacity: 1, height: "auto" }}
 						className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200/80"
 					>
-						<strong>Access denied.</strong> This app is for company
-						accounts on{" "}
-						<code className="rounded bg-rose-100/80 px-1 text-xs">
-							{formatAllowedDomainsForUi()}
-						</code>
-						, or Google accounts your admin has invited. Ask your
-						team if you need access.
+						<strong>Access not granted</strong> after sign-in. Use an invited email
+						or contact an administrator.
 					</motion.p>
-				)}
+				) : null}
 
-				{authMessage && (
+				{authMessage && step !== "denied" ? (
 					<motion.div
 						role="alert"
 						initial={{ opacity: 0, y: -4 }}
@@ -104,33 +175,157 @@ export function LoginPage() {
 							<X className="h-4 w-4" />
 						</button>
 					</motion.div>
-				)}
+				) : null}
 
-				<motion.button
-					type="button"
-					whileTap={{ scale: 0.98 }}
-					whileHover={{ scale: signInLoading ? 1 : 1.01 }}
-					disabled={
-						!isFirebaseConfigured || !authReady || signInLoading
-					}
-					onClick={() => signInWithGoogle()}
-					className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition-[box-shadow,opacity] hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50"
-				>
-					{signInLoading ? (
-						<>
-							<Loader2
-								className="h-5 w-5 shrink-0 animate-spin opacity-90"
-								aria-hidden
+				{step === "email" ? (
+					<div className="space-y-4">
+						<div>
+							<label className="mb-1 block text-xs font-medium text-slate-500">
+								Email
+							</label>
+							<input
+								type="email"
+								autoComplete="email"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+								required
 							/>
-							Signing in…
-						</>
-					) : (
-						<>
-							<LogIn className="h-5 w-5 opacity-90" aria-hidden />
+						</div>
+						<motion.button
+							type="button"
+							whileTap={{ scale: 0.98 }}
+							disabled={
+								!isFirebaseConfigured || !authReady || checkLoading || !email.trim()
+							}
+							onClick={() => void handleCheckEmail()}
+							className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50"
+						>
+							{checkLoading ? (
+								<>
+									<Loader2 className="h-5 w-5 animate-spin opacity-90" />
+									Checking…
+								</>
+							) : (
+								<>
+									<Mail className="h-5 w-5 opacity-90" />
+									Continue with email
+								</>
+							)}
+						</motion.button>
+
+						<div className="relative py-1">
+							<div
+								className="absolute inset-0 flex items-center"
+								aria-hidden
+							>
+								<div className="w-full border-t border-slate-200" />
+							</div>
+							<div className="relative flex justify-center text-xs">
+								<span className="bg-white px-2 text-slate-400">or</span>
+							</div>
+						</div>
+
+						<motion.button
+							type="button"
+							whileTap={{ scale: 0.98 }}
+							disabled={!isFirebaseConfigured || !authReady || signInLoading || checkLoading}
+							onClick={() => signInWithGoogle()}
+							className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
+						>
+							{signInLoading ? (
+								<Loader2 className="h-5 w-5 animate-spin opacity-90" />
+							) : (
+								<LogIn className="h-5 w-5 opacity-90" aria-hidden />
+							)}
 							Sign in with Google
-						</>
-					)}
-				</motion.button>
+						</motion.button>
+						<p className="text-center text-[0.65rem] leading-relaxed text-slate-400">
+							Google opens a consent window and may request Gmail access if your
+							role needs it.
+						</p>
+					</div>
+				) : null}
+
+				{step === "password" ? (
+					<form onSubmit={handleSubmitPassword} className="space-y-4">
+						<p className="text-xs text-slate-500">
+							Email:{" "}
+							<span className="font-medium text-slate-700">{email}</span>
+							{" · "}
+							<button
+								type="button"
+								onClick={() => goBackToEmail()}
+								className="font-medium text-sky-700 hover:underline"
+							>
+								Change
+							</button>
+						</p>
+						<p className="rounded-lg bg-slate-50 px-3 py-2 text-[0.7rem] leading-relaxed text-slate-600 ring-1 ring-slate-100">
+							Haven’t created a password yet? A superadmin can send a{" "}
+							<strong>setup link</strong> from <strong>Team</strong>. Or use
+							Google below if your account was created that way.
+						</p>
+						<div>
+							<label className="mb-1 block text-xs font-medium text-slate-500">
+								Password
+							</label>
+							<input
+								type="password"
+								autoComplete="current-password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+								required
+								minLength={6}
+							/>
+						</div>
+						<motion.button
+							type="submit"
+							whileTap={{ scale: 0.98 }}
+							disabled={!isFirebaseConfigured || !authReady || signInLoading}
+							className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50"
+						>
+							{signInLoading ? (
+								<>
+									<Loader2 className="h-5 w-5 animate-spin opacity-90" />
+									Signing in…
+								</>
+							) : (
+								<>
+									<Mail className="h-5 w-5 opacity-90" />
+									Sign in
+								</>
+							)}
+						</motion.button>
+						<button
+							type="button"
+							onClick={() => sendPasswordReset(email)}
+							disabled={!isFirebaseConfigured || !email.trim() || signInLoading}
+							className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-50"
+						>
+							Forgot password?
+						</button>
+					</form>
+				) : null}
+
+				{step === "password" ? (
+					<div className="mt-6 border-t border-slate-100 pt-6">
+						<p className="mb-2 text-center text-xs text-slate-400">
+							Prefer Google?
+						</p>
+						<motion.button
+							type="button"
+							whileTap={{ scale: 0.98 }}
+							disabled={!isFirebaseConfigured || !authReady || signInLoading}
+							onClick={() => signInWithGoogle()}
+							className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
+						>
+							<LogIn className="h-4 w-4 opacity-90" />
+							Sign in with Google
+						</motion.button>
+					</div>
+				) : null}
 			</motion.div>
 		</div>
 	);

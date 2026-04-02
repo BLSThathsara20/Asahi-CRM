@@ -1,5 +1,5 @@
 /**
- * Turn Google Sheets API error JSON into a short message for users.
+ * Turn Google API error JSON (Gmail, etc.) into a short message for users.
  * @param {number} status HTTP status
  * @param {string} bodyText response body (often JSON)
  */
@@ -26,41 +26,41 @@ export function messageFromSheetsResponse(status, bodyText) {
 			msg.includes("it is disabled") ||
 			msg.includes("API has not been used")
 		) {
-			return "Google Sheets API is not enabled for your Firebase project. In Google Cloud Console, open the same project as Firebase (e.g. asahi-crm) → APIs & Services → Library → search “Google Sheets API” → Enable. Wait a minute, then refresh this page.";
+			return "A Google API is not enabled for this Cloud project. In Google Cloud Console (same project as Firebase) → APIs & Services → Library, enable Gmail API, wait briefly, then try again.";
 		}
 		if (
 			reason0 === "PERMISSION_DENIED" ||
 			msg.includes("does not have permission") ||
 			msg.includes("Request had insufficient authentication scopes")
 		) {
-			return "Access denied to the spreadsheet. Make sure the Google account you signed in with has been given access to the sheet (Editor), and that sign-in included permission for Google Sheets.";
+			return "Google denied this request. Confirm Gmail scopes are on the OAuth consent screen, add test users if the app is in Testing, then use Connect Gmail again.";
 		}
-		return "Google blocked this request (403). Check that Sheets API is enabled and the spreadsheet is shared with your account.";
+		return "Google blocked this request (403). Check Gmail API and OAuth scopes.";
 	}
 
 	if (status === 404) {
-		return 'Spreadsheet or tab not found. Confirm the Sheet ID and that a tab named exactly "All leads" exists.';
+		return "Google API returned not found (404). If this persists, try reconnecting Gmail.";
 	}
 
 	if (status === 400) {
 		if (msg.length > 0 && msg.length < 280) return msg;
-		return "The spreadsheet rejected the request. Check column layout and sheet name.";
+		return "Google rejected this request (400).";
 	}
 
 	if (apiErr?.message && apiErr.message.length < 280) {
 		return apiErr.message;
 	}
 
-	return `Could not talk to Google Sheets (error ${status}). If this continues, contact your administrator.`;
+	return `Could not reach Google (error ${status}). If this continues, contact your administrator.`;
 }
 
-/** Normalize any thrown Sheets error (including legacy raw JSON strings) for display */
+/** Normalize any thrown Google API error (including legacy raw JSON strings) for display */
 export function formatSheetsThrownError(err) {
-	if (!err?.message) return "Something went wrong with Google Sheets.";
+	if (!err?.message) return "Something went wrong talking to Google.";
 	const m = err.message;
 	if (m === "UNAUTHORIZED") return m;
-	if (m === "SHEETS_NOT_CONNECTED") {
-		return "Google Sheets isn’t connected. On the lead list, tap “Allow Google Sheets access”, complete the Google step, then try again.";
+	if (m === "GOOGLE_API_NOT_CONNECTED" || m === "SHEETS_NOT_CONNECTED") {
+		return "Google isn’t connected for Gmail. Use “Continue with Google” on the connection screen, then try again.";
 	}
 	if (m.startsWith("{")) {
 		try {

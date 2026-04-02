@@ -1,0 +1,11 @@
+{
+	"name": "asahi-crm-sanity-studio",
+	"private": true,
+	"scripts": {
+		"deploy-schema": "sanity schema deploy",
+		"studio": "sanity dev"
+	},
+	"dependencies": {
+		"sanity": "^3.68.0"
+	}
+}

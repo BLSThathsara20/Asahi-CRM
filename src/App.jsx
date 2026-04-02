@@ -1,123 +1,147 @@
-import { useEffect, useState } from "react";
-import { AddLeadModal } from "./components/AddLeadModal.jsx";
-import { AdminAccessPage } from "./components/AdminAccessPage.jsx";
+import {
+	BrowserRouter,
+	Navigate,
+	Outlet,
+	Route,
+	Routes,
+	useLocation,
+	useNavigate,
+} from "react-router-dom";
 import { AppShell } from "./components/AppShell.jsx";
-import { BottomNav } from "./components/BottomNav.jsx";
-import { LeadBoard } from "./components/LeadBoard.jsx";
-import { LeadDetailPanel } from "./components/LeadDetailPanel.jsx";
+import { GoogleConnectScreen } from "./components/GoogleConnectScreen.jsx";
 import { LoginPage } from "./components/LoginPage.jsx";
-import { SheetsConnectScreen } from "./components/SheetsConnectScreen.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import {
+	PermissionsProvider,
+	usePermissions,
+} from "./context/PermissionsContext.jsx";
+import { DashboardPage } from "./pages/DashboardPage.jsx";
+import { SetPasswordPage } from "./pages/SetPasswordPage.jsx";
+import { UserManagementPage } from "./pages/UserManagementPage.jsx";
 
-function CrmApp() {
-	const {
-		user,
-		authReady,
-		signOutUser,
-		sheetsSessionReady,
-		isSuperAdmin,
-	} = useAuth();
-	const [screen, setScreen] = useState("crm");
-	const [selectedLead, setSelectedLead] = useState(null);
-	const [addOpen, setAddOpen] = useState(false);
-	const [refreshKey, setRefreshKey] = useState(0);
+function routerBasename() {
+	const base = import.meta.env.BASE_URL || "/";
+	if (base === "/") return undefined;
+	return base.replace(/\/$/, "") || undefined;
+}
 
-	useEffect(() => {
-		if (!user) setScreen("crm");
-	}, [user]);
+function FullPageLoading() {
+	return (
+		<div className="flex min-h-screen items-center justify-center bg-slate-50">
+			<p className="text-sm text-slate-500">Loading…</p>
+		</div>
+	);
+}
 
-	useEffect(() => {
-		if (screen === "admin" && !isSuperAdmin) setScreen("crm");
-	}, [screen, isSuperAdmin]);
+function LoginRoute() {
+	const { user, authReady } = useAuth();
+	if (!authReady) return <FullPageLoading />;
+	if (user) return <Navigate to="/dashboard" replace />;
+	return <LoginPage />;
+}
 
-	const bumpRefresh = () => setRefreshKey((k) => k + 1);
+function RootRedirect() {
+	const { user, authReady } = useAuth();
+	if (!authReady) return <FullPageLoading />;
+	if (!user) return <Navigate to="/login" replace />;
+	return <Navigate to="/dashboard" replace />;
+}
 
-	if (!authReady) {
-		return (
-			<div className="flex min-h-screen items-center justify-center bg-slate-50">
-				<p className="text-sm text-slate-500">Loading…</p>
-			</div>
-		);
+function RequireAuth() {
+	const { user, authReady } = useAuth();
+	if (!authReady) return <FullPageLoading />;
+	if (!user) return <Navigate to="/login" replace />;
+	return <Outlet />;
+}
+
+function GmailConnectGate() {
+	const { googleAccessSessionReady } = useAuth();
+	const { permissions, permissionsLoading } = usePermissions();
+	const location = useLocation();
+
+	if (permissionsLoading) return <FullPageLoading />;
+
+	const needGmail = Boolean(permissions.gmailAccess);
+	if (needGmail && !googleAccessSessionReady) {
+		if (location.pathname !== "/connect-gmail") {
+			return <Navigate to="/connect-gmail" replace />;
+		}
+	} else if (location.pathname === "/connect-gmail") {
+		return <Navigate to="/dashboard" replace />;
 	}
 
-	if (!user) {
-		return <LoginPage />;
-	}
+	return <Outlet />;
+}
 
-	/* Firebase OK, but no Google Sheets OAuth token yet — don’t show empty CRM */
-	if (!sheetsSessionReady) {
-		return <SheetsConnectScreen />;
-	}
+function RequireManageUsers() {
+	const { permissions, permissionsLoading } = usePermissions();
+	if (permissionsLoading) return <FullPageLoading />;
+	if (!permissions.manageUsers) return <Navigate to="/dashboard" replace />;
+	return <Outlet />;
+}
+
+function ShellLayout() {
+	const { signOutUser } = useAuth();
+	const { permissions } = usePermissions();
+	const navigate = useNavigate();
+	const location = useLocation();
+
+	const onAddLead = permissions.addPhysicalLeads
+		? () => navigate("/dashboard?add=1")
+		: null;
+
+	const title = location.pathname.startsWith("/users")
+		? "Team"
+		: permissions.viewPipeline
+			? "Pipeline"
+			: "Home";
 
 	return (
-		<>
-			<AppShell
-				title={screen === "admin" ? "Manage access" : "Leads"}
-				onBack={
-					screen === "admin" ? () => setScreen("crm") : undefined
-				}
-				onManageAccess={
-					screen === "crm" && isSuperAdmin
-						? () => setScreen("admin")
-						: undefined
-				}
-				onSignOut={signOutUser}
-				onAddLead={
-					screen === "crm"
-						? () => {
-								setAddOpen(true);
-								setSelectedLead(null);
-							}
-						: undefined
-				}
-			>
-				{screen === "admin" ? (
-					<AdminAccessPage />
-				) : (
-					<LeadBoard
-						refreshKey={refreshKey}
-						onSelectLead={(l) => {
-							setSelectedLead(l);
-							setAddOpen(false);
-						}}
-					/>
-				)}
-			</AppShell>
-			{screen === "crm" && (
-				<>
-					<BottomNav
-						active={addOpen ? "add" : "leads"}
-						onLeads={() => {
-							setAddOpen(false);
-							setSelectedLead(null);
-							window.scrollTo({ top: 0, behavior: "smooth" });
-						}}
-						onAdd={() => {
-							setAddOpen(true);
-							setSelectedLead(null);
-						}}
-					/>
-					<LeadDetailPanel
-						lead={selectedLead}
-						open={Boolean(selectedLead)}
-						onClose={() => setSelectedLead(null)}
-						onSaved={bumpRefresh}
-					/>
-					<AddLeadModal
-						open={addOpen}
-						onClose={() => setAddOpen(false)}
-						onSaved={bumpRefresh}
-					/>
-				</>
-			)}
-		</>
+		<AppShell
+			onSignOut={signOutUser}
+			onAddLead={onAddLead}
+			title={title}
+			showTeamLink={permissions.manageUsers}
+			homeNavLabel={permissions.viewPipeline ? "Pipeline" : "Home"}
+		>
+			<Outlet />
+		</AppShell>
+	);
+}
+
+function CrmRoutes() {
+	return (
+		<Routes>
+			<Route path="/set-password" element={<SetPasswordPage />} />
+			<Route path="/login" element={<LoginRoute />} />
+			<Route path="/" element={<RootRedirect />} />
+			<Route element={<RequireAuth />}>
+				<Route element={<GmailConnectGate />}>
+					<Route path="/connect-gmail" element={<GoogleConnectScreen />} />
+					<Route element={<ShellLayout />}>
+						<Route path="/dashboard" element={<DashboardPage />} />
+						<Route element={<RequireManageUsers />}>
+							<Route
+								path="/users"
+								element={<UserManagementPage />}
+							/>
+						</Route>
+					</Route>
+				</Route>
+			</Route>
+			<Route path="*" element={<Navigate to="/dashboard" replace />} />
+		</Routes>
 	);
 }
 
 export default function App() {
 	return (
-		<AuthProvider>
-			<CrmApp />
-		</AuthProvider>
+		<BrowserRouter basename={routerBasename()}>
+			<AuthProvider>
+				<PermissionsProvider>
+					<CrmRoutes />
+				</PermissionsProvider>
+			</AuthProvider>
+		</BrowserRouter>
 	);
 }
