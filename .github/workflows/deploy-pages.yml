@@ -34,6 +34,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_STAFF_FIRST_NAME: ${{ secrets.VITE_STAFF_FIRST_NAME }}
+          VITE_SUPERADMIN_EMAILS: ${{ secrets.VITE_SUPERADMIN_EMAILS }}
           VITE_SANITY_PROJECT_ID: ${{ secrets.VITE_SANITY_PROJECT_ID }}
           VITE_SANITY_DATASET: ${{ secrets.VITE_SANITY_DATASET }}
           VITE_SANITY_API_TOKEN: ${{ secrets.VITE_SANITY_API_TOKEN }}
